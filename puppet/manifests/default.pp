@@ -141,21 +141,46 @@ class postrvm {
     }
 
     #/home/vagrant/.rvm/rubies/ruby-1.9.3-p392/bin/gem
+    #source all rvm files
+    #source ~/.rvm/scripts/rvm
+    #source ~/.rvm/environments/ruby-1.9.3-p392@global
+    #source ~/.rvm/environments/ruby-1.9.3-p392
+    #
 
+    exec{ "rvm_source":
+        user => vagrant,
+
+        command => "bash -l -c 'source ~/.rvm/environments/ruby-1.9.3-p392@global'",
+
+        require => exec['set_a_ruby'],
+        environment => "HOME=/home/vagrant",
+    }
+
+/*
+    exec{ "rvm_zsh_source":
+        user => vagrant,
+
+        command => "source ~/.rvm/environments/ruby-1.9.3-p392@global",
+
+        require => exec['rvm_source'],
+        environment => "HOME=/home/vagrant",
+    }
+*/
     #get gem!!!
     exec{ "gem_install":
         user => vagrant,
 
-        command => "bash -l -c 'rvm rubygems latest --verify-downloads 1'",
+        command => "bash -l -c 'rvm rubygems latest --verify-downloads 1 >> /code/code/error.log 2>&1'",
 
-        require => exec['set_a_ruby'],
+        require => exec['rvm_source'],
         environment => "HOME=/home/vagrant",
     }
 
     exec{ "bundle_install":
         user => vagrant,
 
-        command => "sudo bash -l -c '/home/vagrant/.rvm/rubies/ruby-1.9.3-p392/bin/gem install bundle --no-rdoc --no-ri >> /code/code/error.log 2>&1'",
+        #command => "sudo bash -l -c '/home/vagrant/.rvm/rubies/ruby-1.9.3-p392/bin/gem install bundle --no-rdoc --no-ri >> /code/code/error.log 2>&1'",
+        command => "sudo bash -l -c 'gem install bundle --no-rdoc --no-ri >> /code/code/error.log 2>&1'",
 
         require => exec['gem_install'],
         environment => "HOME=/home/vagrant",
@@ -163,11 +188,13 @@ class postrvm {
 
     exec{ "rails_install":
         user => vagrant,
-        command => "sudo bash -l -c '/home/vagrant/.rvm/rubies/ruby-1.9.3-p392/bin/gem install rails >> /code/code/error.log 2>&1'",
+        #command => "sudo bash -l -c '/home/vagrant/.rvm/rubies/ruby-1.9.3-p392/bin/gem install rails >> /code/code/error.log 2>&1'",
+        command => "sudo bash -l -c 'gem install rails >> /code/code/error.log 2>&1'",
         require => Exec['bundle_install'],
         environment => "HOME=/home/vagrant",
         timeout => 0
     }
+
 }
 
 stage { 'postrvm_stage':
@@ -230,6 +257,7 @@ class rails_setup {
     # run bundler on it
     exec{ "bundler_install" :
         command => "sudo bash -l -c 'bundle install >> /code/code/error.log 2>&1'",
+        #command => "sudo bash -l -c '/home/vagrant/.rvm/gems/ruby-1.9.3-p392@global/bin/bundle install >> /code/code/error.log 2>&1'",
         cwd => "/code/code/rails/rails-test-1",
         user => vagrant,
         require => File["/code/code/rails/rails-test-1/Gemfile"],
@@ -273,7 +301,7 @@ class user_land {
     file { "/home/vagrant/.zprofile":
         source  => "puppet:////local-home/.zprofile"
     }
-
+/*
     file { "/home/vagrant/.oh-my-zsh":
         ensure => directory, # so make this a directory
         recurse => true, # enable recursive directory management
@@ -283,7 +311,7 @@ class user_land {
         source  => "puppet:////local-home/.oh-my-zsh",
         require => Exec['oh-my-zsh-install'],
     }
-
+*/
     file { "/home/vagrant/.vimrc":
         source  => "puppet:////local-home/.vimrc"
     }
