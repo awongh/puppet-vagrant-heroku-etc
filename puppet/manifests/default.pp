@@ -1,4 +1,14 @@
+#
+#
+
+# install apt and update the system before anything else
+
+#
+################### ###########################
+
 include apt
+
+# why are we mentioning a non-existant stage and this works?!?!?!
 stage { 'req-install': before => Stage['rvm-install'] }
 
 class requirements {
@@ -9,6 +19,16 @@ class requirements {
 }
 
 class { requirements:, stage => "req-install" }
+
+#
+#
+
+# rvm.
+# hacked the module to just do a single user install. 
+# see the module at modules/rvm
+
+#
+################### ###########################
 
 class installrvm {
     include rvm
@@ -21,6 +41,14 @@ stage { 'rvm_stage':
 class { 'installrvm':
     stage => rvm_stage,
 }
+
+#
+#
+
+# install postgres
+# run some raw sql commands to set up all the rails and admin type users
+#
+################### ###########################
 
 class postgresinstall {
     include postgresql
@@ -42,6 +70,14 @@ class postgresinstall {
     } 
 }
 
+#
+#
+
+# main area.  
+# potluck commands. install more stuff
+#
+################### ###########################
+
 class main_install_stage {
     Exec { path => '/usr/bin:/bin:/usr/sbin:/sbin' }
 
@@ -60,7 +96,8 @@ class main_install_stage {
       ensure => installed, require => Exec['apt-update']
     }
 
-    #stuff for rvm??!!??
+    # WARNING!
+    # this is a hack: an rvm message said that these repos are missing:
     package {
     ["libgdbm-dev", "libtool", "pkg-config", "libffi-dev"]:
       ensure => installed, require => Exec['apt-update']
@@ -70,6 +107,17 @@ class main_install_stage {
 }
 
 class { 'main_install_stage': }
+
+#
+#
+
+#ruby stuff. 
+# get a ruby version for rails. (we have hardcoded the version instead of "rvm latest")
+# get rubygems
+# get bundle
+# get rails
+#
+################### ###########################
 
 class postrvm {
 
@@ -130,6 +178,19 @@ class { 'postrvm':
     stage => postrvm_stage,
 }
 
+#
+#
+
+#rails
+# set rails up
+# create the files: we have a local dir file with a generic gemfile.
+# the correct dependencies will load everytime.
+# dirs are: /code/code/rails
+# on the host machine a file called: Gemfile.vagrant
+# run bundle on the gemfile 
+#
+################### ###########################
+
 class rails_setup {
 
     Exec { path => '/usr/bin:/bin:/usr/sbin:/sbin:/home/vagrant/.rvm/bin' }
@@ -183,6 +244,14 @@ stage { 'rails_setup_stage' :
 class { 'rails_setup':
     stage => 'rails_setup_stage'
 }
+
+#
+#
+
+#user
+# setup user stuff. import shell profile files.
+#
+################### ###########################
 
 class user_land {
 
