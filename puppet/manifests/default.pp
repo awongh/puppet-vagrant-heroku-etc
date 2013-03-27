@@ -147,49 +147,25 @@ class postrvm {
     #source ~/.rvm/environments/ruby-1.9.3-p392
     #
 
-    exec{ "rvm_source":
+    exec{ "rvm_source_postrvm":
         user => vagrant,
 
-        command => "bash -l -c 'source ~/.rvm/environments/ruby-1.9.3-p392@global'",
+        command => "bash -l -c 'source ~/.rvm/environments/ruby-1.9.3-p392@global >> /code/code/error.log 2>&1'",
 
         require => exec['set_a_ruby'],
         environment => "HOME=/home/vagrant",
     }
 
-/*
-    exec{ "rvm_zsh_source":
-        user => vagrant,
-
-        command => "source ~/.rvm/environments/ruby-1.9.3-p392@global",
-
-        require => exec['rvm_source'],
-        environment => "HOME=/home/vagrant",
-    }
-*/
-    #get gem!!!
-    exec{ "gem_install":
-        user => vagrant,
-
-        command => "bash -l -c 'rvm rubygems latest --verify-downloads 1 >> /code/code/error.log 2>&1'",
-
-        require => exec['rvm_source'],
-        environment => "HOME=/home/vagrant",
-    }
-
     exec{ "bundle_install":
         user => vagrant,
-
-        #command => "sudo bash -l -c '/home/vagrant/.rvm/rubies/ruby-1.9.3-p392/bin/gem install bundle --no-rdoc --no-ri >> /code/code/error.log 2>&1'",
-        command => "sudo bash -l -c 'gem install bundle --no-rdoc --no-ri >> /code/code/error.log 2>&1'",
-
-        require => exec['gem_install'],
+        command => "sudo bash -l -c '/home/vagrant/.rvm/rubies/ruby-1.9.3-p392/bin/gem install bundle --no-rdoc --no-ri >> /code/code/error.log 2>&1'",
+        require => exec['set_a_ruby'],
         environment => "HOME=/home/vagrant",
     }
 
     exec{ "rails_install":
         user => vagrant,
-        #command => "sudo bash -l -c '/home/vagrant/.rvm/rubies/ruby-1.9.3-p392/bin/gem install rails >> /code/code/error.log 2>&1'",
-        command => "sudo bash -l -c 'gem install rails >> /code/code/error.log 2>&1'",
+        command => "sudo bash -l -c '/home/vagrant/.rvm/rubies/ruby-1.9.3-p392/bin/gem install rails >> /code/code/error.log 2>&1'",
         require => Exec['bundle_install'],
         environment => "HOME=/home/vagrant",
         timeout => 0
@@ -222,12 +198,19 @@ class rails_setup {
 
     Exec { path => '/usr/bin:/bin:/usr/sbin:/sbin:/home/vagrant/.rvm/bin' }
 
+    exec{ "rvm_source":
+        user => vagrant,
+        command => "bash -l -c 'source ~/.rvm/environments/ruby-1.9.3-p392@global >> /code/code/error.log 2>&1'",
+        environment => "HOME=/home/vagrant",
+    }
+
     file { "/code/code" : 
       path    => "/code/code", 
       mode    => 0755, 
       owner   => vagrant, 
       ensure  => directory, 
       recurse => true, 
+      require => exec['rvm_source'],
     } 
 
     file { "/code/code/rails" : 
@@ -254,15 +237,22 @@ class rails_setup {
         require => Exec["new_rails_project"]
     }
 
+    /*
+    #the paths on this are wrong.....
+    #dunno how to fix the gem paths...
+
     # run bundler on it
     exec{ "bundler_install" :
-        command => "sudo bash -l -c 'bundle install >> /code/code/error.log 2>&1'",
+        command => "rvmsudo bundle install /code/code/error.log 2>&1",
+        #command => "rvmsudo bundle install --path=/home/vagrant/.rvm/gems/ruby-1.9.3-p392/gems >> /code/code/error.log 2>&1",
+        #command => "sudo bash -l -c 'bundle install --path=/home/vagrant/.rvm/gems/ruby-1.9.3-p392/gems >> /code/code/error.log 2>&1'",
         #command => "sudo bash -l -c '/home/vagrant/.rvm/gems/ruby-1.9.3-p392@global/bin/bundle install >> /code/code/error.log 2>&1'",
         cwd => "/code/code/rails/rails-test-1",
         user => vagrant,
         require => File["/code/code/rails/rails-test-1/Gemfile"],
         environment => "HOME=/home/vagrant",
     }
+    */
 }
 
 stage { 'rails_setup_stage' :
@@ -301,7 +291,7 @@ class user_land {
     file { "/home/vagrant/.zprofile":
         source  => "puppet:////local-home/.zprofile"
     }
-/*
+
     file { "/home/vagrant/.oh-my-zsh":
         ensure => directory, # so make this a directory
         recurse => true, # enable recursive directory management
@@ -311,7 +301,7 @@ class user_land {
         source  => "puppet:////local-home/.oh-my-zsh",
         require => Exec['oh-my-zsh-install'],
     }
-*/
+
     file { "/home/vagrant/.vimrc":
         source  => "puppet:////local-home/.vimrc"
     }
