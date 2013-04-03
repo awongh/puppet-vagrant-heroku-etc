@@ -13,6 +13,7 @@ stage { 'req-install': before => Stage['rvm-install'] }
 
 class requirements {
   group { "puppet": ensure => "present", }
+
   exec { "apt-update":
     command => "/usr/bin/apt-get -y update"
   }
@@ -52,22 +53,19 @@ class { 'installrvm':
 
 class postgresinstall {
     include postgresql
-    include postgresql::server
+    include postgresql::contrib
+    include postgresql::devel
 
-    #want to run any commands inside psql?
-    #sudo -u postgres psql
+    class { 'postgresql::server':
+      config_hash => {
+        'ip_mask_deny_postgres_user' => '0.0.0.0/32',
+        'ip_mask_allow_all_users'    => '0.0.0.0/0',
+        'listen_addresses'           => '*',
+        'ipv4acls'                   => ['hostssl all johndoe 192.168.0.0/24 cert'],
+      },
+    }
 
-    postgresql::psql { "CREATE ROLE vagrant LOGIN CREATEROLE CREATEDB SUPERUSER": 
-         db => 'postgres',
-         user => 'postgres',
-         unless => "SELECT rolename FROM pg_roles WHERE rolename='vagrant'"
-    } 
-
-    postgresql::psql { "CREATE ROLE root LOGIN CREATEROLE CREATEDB SUPERUSER": 
-         db => 'postgres',
-         user => 'postgres',
-         unless => "SELECT rolename FROM pg_roles WHERE rolename='root'"
-    } 
+    include postgresql::client
 }
 
 #
@@ -81,7 +79,7 @@ class postgresinstall {
 class main_install_stage {
     Exec { path => '/usr/bin:/bin:/usr/sbin:/sbin' }
 
-    #include postgresinstall
+    include postgresinstall
 
     exec { "apt-update-again":
         command => "/usr/bin/apt-get -y update"
@@ -92,7 +90,7 @@ class main_install_stage {
 
     #apt packages we want installed
     package {
-    ["vim", "python-software-properties", "memcached", "augeas-tools", "libaugeas-dev", "libaugeas-ruby", "libpq-dev"]: 
+    ["vim", "python-software-properties", "memcached", "augeas-tools", "libaugeas-dev", "libaugeas-ruby"]: 
       ensure => installed, require => Exec['apt-update']
     }
 
@@ -237,6 +235,12 @@ class rails_setup {
         require => Exec["new_rails_project"]
     }
 
+    # copy the database setup fill
+    file { "/code/code/rails/rails-test-1/config/datablase.yml":
+        source  => "puppet:////local-home/database.yml.vagrant",
+        require => File["/code/code/rails/rails-test-1/Gemfile"]
+    }
+
     /*
     #the paths on this are wrong.....
     #dunno how to fix the gem paths...
@@ -281,6 +285,7 @@ class user_land {
        user => vagrant,
        environment => "HOME=/home/vagrant",
        command => "bash -l -c '/usr/bin/curl -L https://github.com/robbyrussell/oh-my-zsh/raw/master/tools/install.sh | bash >> /code/code/error.log 2>&1'",
+       timeout => 0,
     }
 
     file { "/home/vagrant/.bash_aliases":
@@ -313,6 +318,22 @@ class user_land {
         force => true, # also purge subdirs and links etc.
         source  => "puppet:////local-home/.vim"
     }
+
+    #want to run any commands inside psql?
+    #sudo -u postgres psql
+
+    postgresql::psql { "CREATE ROLE vagrant LOGIN CREATEROLE CREATEDB SUPERUSER": 
+         db => 'postgres',
+         user => 'postgres',
+         unless => "SELECT rolename FROM pg_roles WHERE rolename='vagrant'"
+    } 
+
+    postgresql::psql { "CREATE ROLE root LOGIN CREATEROLE CREATEDB SUPERUSER": 
+         db => 'postgres',
+         user => 'postgres',
+         unless => "SELECT rolename FROM pg_roles WHERE rolename='root'"
+    }
+
 }
 
 stage { 'user_land_stage':

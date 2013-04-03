@@ -1,12 +1,14 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
-box_name = "36-puppet-test"
+box_name = "2-heroku"
 
 Vagrant::Config.run do |config|
     config.vm.host_name = "#{box_name}"
     config.vm.box = "#{box_name}"
 
-    config.vm.forward_port 3000, 80
+    config.vm.forward_port 80, 3000 
+
+    #config.vm.forward_port 3000, 80
 
     # share a local code folder for editing in a native env
     config.vm.share_folder "#{box_name}", "/code", "/code/vagrant/#{box_name}", :create=>true

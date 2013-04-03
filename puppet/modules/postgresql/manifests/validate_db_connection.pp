@@ -13,9 +13,6 @@
 #   [*database_password*]   - the postgres user's password
 #   [*database_name*]       - the database name that the connection should be
 #                             established against
-#   [*client_package_name*] - (optional) the name of the postgres client package
-#                             that provides the psql tool, if you aren't using
-#                             the default system package.
 #
 # NOTE: to some degree this type assumes that you've created the corresponding
 # postgres database instance that you are validating by using the
@@ -45,51 +42,36 @@
 #
 
 define postgresql::validate_db_connection(
-    $database_host,
-    $database_port = 5432,
-    $database_username,
-    $database_password,
-    $database_name,
-    $client_package_name = ""
+  $database_host,
+  $database_name,
+  $database_password,
+  $database_username,
+  $database_port = 5432
 ) {
-    include postgresql::params
+  require postgresql::client
 
-    # This is a bit messy, but we need to use the correct client package name
-    # from the params class if the user did not explicitly provide one.
-    if (! $client_package_name) {
-        $package_name = $postgresql::params::client_package_name
-    } else {
-        $package_name = $client_package_name
-    }
+  # TODO: port to ruby
+  $psql = "${postgresql::params::psql_path} --tuples-only --quiet -h ${database_host} -U ${database_username} -p ${database_port} --dbname ${database_name}"
 
-    # Make sure the postgres client package is installed; we need it for
-    # `psql`.
-    package { 'postgresql-client':
-        name   => $package_name,
-        ensure => present,
-    }
+  $exec_name = "validate postgres connection for ${database_host}/${database_name}"
+  exec { $exec_name:
+    command     => '/bin/false',
+    unless      => "/bin/echo \"SELECT 1\" | ${psql}",
+    cwd         => '/tmp',
+    environment => "PGPASSWORD=${database_password}",
+    logoutput   => 'on_failure',
+    require     => Package['postgresql-client'],
+  }
 
-    # TODO: port to ruby
-    $psql = "${postgresql::params::psql_path} --tuples-only --quiet -h $database_host -U $database_username -p $database_port --dbname $database_name"
-
-    $exec_name = "validate postgres connection for $database_host/$database_name"
-    exec {$exec_name:
-      command     => "/bin/echo \"SELECT 1\" | $psql",
-      cwd         => '/tmp',
-      environment => "PGPASSWORD=$database_password",
-      logoutput   => 'on_failure',
-      require     => Package['postgresql-client'],
-    }
-
-    # This is a little bit of puppet magic.  What we want to do here is make
-    # sure that if the validation and the database instance creation are being
-    # applied on the same machine, then the database resource is applied *before*
-    # the validation resource.  Otherwise, the validation is guaranteed to fail
-    # on the first run.
-    #
-    # We accomplish this by using Puppet's resource collection syntax to search
-    # for the Database resource in our current catalog; if it exists, the
-    # appropriate relationship is created here.
-    Database<|title == $database_name|> -> Exec[$exec_name]
+  # This is a little bit of puppet magic.  What we want to do here is make
+  # sure that if the validation and the database instance creation are being
+  # applied on the same machine, then the database resource is applied *before*
+  # the validation resource.  Otherwise, the validation is guaranteed to fail
+  # on the first run.
+  #
+  # We accomplish this by using Puppet's resource collection syntax to search
+  # for the Database resource in our current catalog; if it exists, the
+  # appropriate relationship is created here.
+  Database<|title == $database_name|> -> Exec[$exec_name]
 }
 

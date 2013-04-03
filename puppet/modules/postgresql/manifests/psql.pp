@@ -17,32 +17,39 @@
 # limitations under the License.
 
 define postgresql::psql(
-    $command = $title,
-    $unless,
     $db,
-    $user = 'postgres',
-    $refreshonly = false
+    $unless,
+    $command     = $title,
+    $refreshonly = false,
+    $user        = $postgresql::params::user
 ) {
 
-  require postgresql::params
+  include postgresql::params
 
-  # TODO: FIXME: shellquote does not work, and this regex works for trivial things but not nested escaping.
-  # Need a lexer, preferably a ruby SQL parser to catch errors at catalog time
-  # Possibly https://github.com/omghax/sql ?
+  # TODO: FIXME: shellquote does not work, and this regex works for trivial
+  # things but not nested escaping.  Need a lexer, preferably a ruby SQL parser
+  # to catch errors at catalog time.  Possibly https://github.com/omghax/sql ?
 
-  if ($::postgres_default_version != "8.1") {
-    $no_password_option = "--no-password"
+  if ($postgresql::params::version != '8.1') {
+    $no_password_option = '--no-password'
   }
 
-  $psql = "${postgresql::params::psql_path} $no_password_option --tuples-only --quiet --dbname $db"
-  $quoted_command = regsubst($command, '"', '\\"')
-  $quoted_unless  = regsubst($unless,  '"', '\\"')
+  $psql = "${postgresql::params::psql_path} ${no_password_option} --tuples-only --quiet --dbname ${db}"
 
-  exec {"/bin/echo \"$quoted_command\" | $psql |egrep -v -q '^$'":
+  $quoted_command = regsubst($command, '"', '\\"', 'G')
+  $quoted_unless  = regsubst($unless,  '"', '\\"', 'G')
+
+  $final_cmd = "/bin/echo \"${quoted_command}\" | ${psql} |egrep -v -q '^$'"
+
+  notify { "deprecation warning: ${final_cmd}":
+    message => 'postgresql::psql is deprecated ; please use postgresql_psql instead.',
+  } ->
+
+  exec { $final_cmd:
     cwd         => '/tmp',
     user        => $user,
     returns     => 1,
-    unless      => "/bin/echo \"$quoted_unless\" | $psql | egrep -v -q '^$'",
+    unless      => "/bin/echo \"${quoted_unless}\" | ${psql} | egrep -v -q '^$'",
     refreshonly => $refreshonly,
   }
 }
